@@ -1,0 +1,7 @@
+{
+    "operator" : "Илон Маск",
+    "speed_limit" : 100,
+    "ping": "google.com",
+    "ping_limit": 50,
+    "repeat_mins": 1 
+}
