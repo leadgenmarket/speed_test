@@ -20,17 +20,18 @@ const MainPage = () => {
     
 
     const getInfo = () => {
-        let url = "http://mail.leadactiv.ru/getData.php"
+        let url = "http://mail.leadactiv.ru/getDataNew.php"
         axios.get(url).then((resp) => {
             let users = []
+            let now = new Date()
             resp.data.forEach((user) => {
                 users.push({
-                    name:user.user,
-                    insp:parseFloat(user.insp),
-                    outsp:parseFloat(user.outsp),
-                    ping: parseFloat(user.ping),
-                    loss: parseFloat(user.loss),
-                    time: new Date(user.time * 1000)
+                    name:user.name.replace('_', " "),
+                    insp:parseFloat(Math.round(user.download*100)/100),
+                    outsp:parseFloat(Math.round(user.upload*100)/100),
+                    ping: parseFloat(user.ping[user.ping.length -2].split("_ping=")[1]),
+                    time: new Date(Date.parse(now.getDay()+"/"+now.getMonth()+"/"+now.getFullYear() +" " +user.ping[user.ping.length -2].split("_ping=")[0])),
+                    pings: user.ping
                 })
             })
             setUpdateTime(new Date())
@@ -82,7 +83,18 @@ const MainPage = () => {
         return <div>Загрузка</div>
     }
 
-    const usersInfo = info.map(({name, insp, outsp, ping, loss, time}) => {
+    const showPings = (pings) => {
+        document.querySelectorAll(".modal-dialog").forEach((dialog)=> {
+            dialog.style.display = "none";
+        })
+        document.querySelector('.modal').classList.add('show')
+        document.querySelector('.modal-dialog.pings').style.display="block"
+        document.querySelector('.modal').style.display="block"
+        document.querySelector('body').classList.add('modal-open')
+        document.querySelector('.modal-dialog.pings .modal-body').innerHTML = pings.join("<br>")
+    }
+
+    const usersInfo = info.map(({name, insp, outsp, ping, loss, time, pings}) => {
         let diff = (new Date() - time)/ 60000
 
         return <tr key={name}>
@@ -91,8 +103,8 @@ const MainPage = () => {
                     <td>{insp} м/с</td>
                     <td>{outsp} м/с</td>
                     <td>{ping}</td>
-                    <td>{loss}</td>
                     <td>{time.getMinutes()<10?time.getHours()+":0"+time.getMinutes():time.getHours()+":"+time.getMinutes()}</td>
+                    <td style={{cursor:"pointer"}} onClick={()=>showPings(pings)}>→</td>
                 </tr>
     })
 
@@ -161,8 +173,8 @@ const MainPage = () => {
                                         <th>Входящая скорость</th>
                                         <th>Исходящая скорость</th>
                                         <th>Пинг</th>
-                                        <th>Потеря пакетов</th>
                                         <th>Последняя активность</th>
+                                        <th>Посмотреть пинги</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -266,6 +278,15 @@ const MainPage = () => {
                         <div className="modal-footer">
                             <button type="button" className="btn btn-primary waves-effect waves-float waves-light" onClick={sendSettings} data-bs-dismiss="modal">Сохранить</button>
                         </div>
+                    </div>
+                </div>
+                <div className="modal-dialog modal-dialog-centered pings">
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h4 className="modal-title" id="myModalLabel1">Пинги</h4>
+                            <button type="button" onClick={modalClose} className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div className="modal-body"></div>
                     </div>
                 </div>
             </div>
