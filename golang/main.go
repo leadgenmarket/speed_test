@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"strconv"
 
 	"strings"
 	"sync"
@@ -52,16 +51,16 @@ func main() {
 		},
 	}
 
-	go func(writer *customWriter, user string) {
+	go func(writer *customWriter) {
 		ch := writer.chann.Subscribe()
 		for {
 			select {
 			case msg := <-ch:
 				//вычитываем пинг из канала и шлем на сервер
-				sendPingToServer(msg, user)
+				sendPingToServer(msg, conf.User)
 			}
 		}
-	}(writer, conf.User)
+	}(writer)
 
 	for {
 		//раз в минуту пингуем
@@ -105,12 +104,7 @@ func (c customWriter) Write(p []byte) (int, error) {
 			i++
 		}
 		t := time.Now()
-		ping, err := strconv.ParseFloat(pingS, 64)
-		if err != nil {
-			return len(p), err
-		}
-
-		c.chann.AddMessage(fmt.Sprintf("%s: ping = %f", t.Format("2006-01-02 15:04:05"), ping))
+		c.chann.AddMessage(fmt.Sprintf("%s_ping=%s", t.Format("15:04:05"), pingS))
 	}
 	return len(p), nil
 }
