@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/showwin/speedtest-go/speedtest"
+	"github.com/tatsushid/go-fastping"
 )
 
 const (
@@ -54,54 +56,61 @@ func main() {
 		}
 	}(ctx, targets, conf, logger)
 
-	//все что связанно с ping
-	writer := &customWriter{
-		config: &conf,
-		logger: logger,
-	}
-
-	//первый пинг шлем через три минуты
 	for {
-		//раз в минуту пингуем
-		cmd := exec.Command("ping", conf.Server, "-n", "1") //85.192.32.12
-		cmd.Stdout = writer
-		err := cmd.Run()
-		if err != nil {
-			writer.Error()
-			logger.Error("error pinging: %s", err, map[string]interface{}{})
-		}
-		cmd.Process.Release()
-		time.Sleep(time.Second * 60)
+		pingServer(conf.Server, conf.User, logger)
+		time.Sleep(time.Second * 30) //60
 	}
 
 }
 
-type customWriter struct {
-	config *Config
-	logger Logger
-}
-
-func (c customWriter) Write(p []byte) (int, error) {
-	str := string(p)
-	if string(str[0]) == "b" {
-		i := strings.Index(str, "time=") + 5 //time= для macos
-		pingS := ""
-		for string(str[i]) != "m" {
-			pingS += string(str[i])
-			i++
-		}
+func pingServer(server string, user string, logger Logger) {
+	p := fastping.NewPinger()
+	ra, err := net.ResolveIPAddr("ip4:icmp", server)
+	if err != nil {
 		t := time.Now()
-		err := sendPingToServer(fmt.Sprintf("%s_ping=%s", t.Format("15:04:05"), pingS), c.config.User)
+		err = sendPingToServer(fmt.Sprintf("%d_ping error", t.Unix()), user)
 		if err != nil {
-			c.logger.Error("error sending ping to server: %s", err, map[string]interface{}{})
+			logger.Error("error sending ping to server: %s", err, map[string]interface{}{})
 		}
 	}
-	return len(p), nil
+	p.AddIPAddr(ra)
+	p.OnRecv = func(addr *net.IPAddr, rtt time.Duration) {
+		t := time.Now()
+		err = sendPingToServer(fmt.Sprintf("%d_ping=%v", t.Unix(), rtt), user)
+		if err != nil {
+			logger.Error("error sending ping to server: %s", err, map[string]interface{}{})
+		}
+	}
+	p.OnIdle = func() {
+		//fmt.Println("finish")
+	}
+	err = p.Run()
+	if err != nil {
+		fmt.Println(err)
+	}
 }
 
-func (c customWriter) Error() {
+func processOutput(output []byte, logger Logger, user string) (err error) {
+	str := string(output)
 	t := time.Now()
-	sendPingToServer(fmt.Sprintf("%s: ping error", t.Format("2006-01-02 15:04:05")), c.config.User)
+	i := strings.Index(str, "time=") + 5 //time= для macos
+	if i == -1 {
+		fmt.Println("error pinging")
+		err = sendPingToServer(fmt.Sprintf("%d_error ping", t.Unix()), user)
+		return err
+	}
+	pingS := ""
+	for string(str[i]) != "m" {
+		pingS += string(str[i])
+		i++
+	}
+	fmt.Println("ping = " + pingS)
+	err = sendPingToServer(fmt.Sprintf("%d_ping=%s", t.Unix(), pingS), user)
+	if err != nil {
+		logger.Error("error sending ping to server: %s", err, map[string]interface{}{})
+	}
+
+	return err
 }
 
 func checkInternetSpeed(ctx context.Context, targets speedtest.Servers, conf Config) InternetSpeed {
