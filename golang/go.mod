@@ -3,8 +3,6 @@ module speedtest
 go 1.17
 
 require (
-	github.com/banzaicloud/logrus-runtime-formatter v0.0.0-20190729070250-5ae5475bae5e
-	github.com/fabienm/go-logrus-formatters v1.0.0
 	github.com/pkg/errors v0.9.1
 	github.com/showwin/speedtest-go v1.1.5
 	github.com/sirupsen/logrus v1.8.1
