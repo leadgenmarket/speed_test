@@ -1,3 +1,0 @@
-time="2022-03-15T09:29:00+03:00" level=error msg="exec: \"chcp\": executable file not found in $PATH" error="exec: \"chcp\": executable file not found in $PATH"
-time="2022-03-15T09:29:00+03:00" level=info msg="app started and changed language"
-time="2022-03-15T09:29:01+03:00" level=error msg="exit status 64" error="exit status 64"
