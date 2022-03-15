@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -24,25 +25,34 @@ const (
 )
 
 func main() {
+	fileLog, err := os.OpenFile("./logs.txt", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("error opening file: %v", err)
+	}
+	defer fileLog.Close()
+	logger := NewLogger("internet_speed", 5, fileLog)
 	conf, err := initConfig()
 	if err != nil {
-		panic(err)
+		logger.Panic("error while initializing config: %s", err, map[string]interface{}{})
 	}
 
-	changeWindowsConsoleLanguage()
+	changeWindowsConsoleLanguage(logger)
 	ctx := context.Background()
 	user, _ := speedtest.FetchUserInfo()
 	serverList, _ := speedtest.FetchServerListContext(ctx, user)
 	targets, _ := serverList.FindServer([]int{})
 
-	go func(ctx context.Context, targets speedtest.Servers, conf Config) {
+	go func(ctx context.Context, targets speedtest.Servers, conf Config, logger Logger) {
 		for {
 			//раз в час проверяем скорость интернета
 			is := checkInternetSpeed(ctx, targets, conf)
-			sendSpeedToServer(is, conf.User)
+			err := sendSpeedToServer(is, conf.User)
+			if err != nil {
+				logger.Error("error sending internet speed to server: %s", err, map[string]interface{}{})
+			}
 			time.Sleep(time.Hour)
 		}
-	}(ctx, targets, conf)
+	}(ctx, targets, conf, logger)
 
 	//все что связанно с ping
 	writer := &customWriter{
@@ -51,16 +61,19 @@ func main() {
 		},
 	}
 
-	go func(writer *customWriter) {
+	go func(writer *customWriter, logger Logger) {
 		ch := writer.chann.Subscribe()
 		for {
 			select {
 			case msg := <-ch:
 				//вычитываем пинг из канала и шлем на сервер
-				sendPingToServer(msg, conf.User)
+				err := sendPingToServer(msg, conf.User)
+				if err != nil {
+					logger.Error("error sending ping results to server: %s", err, map[string]interface{}{})
+				}
 			}
 		}
-	}(writer)
+	}(writer, logger)
 
 	for {
 		//раз в минуту пингуем
@@ -69,6 +82,7 @@ func main() {
 		err := cmd.Run()
 		if err != nil {
 			writer.Error()
+			logger.Error("error pinging: %s", err, map[string]interface{}{})
 		}
 		time.Sleep(time.Second * 60)
 	}
@@ -205,7 +219,10 @@ func decodeBytes(input []byte) string {
 	return string(b)
 }
 
-func changeWindowsConsoleLanguage() {
+func changeWindowsConsoleLanguage(logger Logger) {
 	cmdlan := exec.Command("chcp", "437")
-	cmdlan.Run()
+	err := cmdlan.Run()
+	if err != nil {
+		logger.Error("termainal language change error: %s", err, map[string]interface{}{})
+	}
 }
