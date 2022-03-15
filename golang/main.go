@@ -6,18 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
 
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/showwin/speedtest-go/speedtest"
-	"golang.org/x/text/encoding/charmap"
 )
 
 const (
@@ -56,25 +53,11 @@ func main() {
 
 	//все что связанно с ping
 	writer := &customWriter{
-		chann: &messagesChan{
-			chann: make(chan string),
-		},
+		config: &conf,
+		logger: logger,
 	}
 
-	go func(writer *customWriter, logger Logger) {
-		ch := writer.chann.Subscribe()
-		for {
-			select {
-			case msg := <-ch:
-				//вычитываем пинг из канала и шлем на сервер
-				err := sendPingToServer(msg, conf.User)
-				if err != nil {
-					logger.Error("error sending ping results to server: %s", err, map[string]interface{}{})
-				}
-			}
-		}
-	}(writer, logger)
-
+	//первый пинг шлем через три минуты
 	for {
 		//раз в минуту пингуем
 		cmd := exec.Command("ping", conf.Server, "-n", "1") //85.192.32.12
@@ -84,28 +67,15 @@ func main() {
 			writer.Error()
 			logger.Error("error pinging: %s", err, map[string]interface{}{})
 		}
+		cmd.Process.Release()
 		time.Sleep(time.Second * 60)
 	}
 
 }
 
-type messagesChan struct {
-	chann chan string
-	mu    sync.RWMutex
-}
-
-func (m *messagesChan) AddMessage(msg string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.chann <- msg
-}
-
-func (m *messagesChan) Subscribe() <-chan string {
-	return m.chann
-}
-
 type customWriter struct {
-	chann *messagesChan
+	config *Config
+	logger Logger
 }
 
 func (c customWriter) Write(p []byte) (int, error) {
@@ -118,14 +88,17 @@ func (c customWriter) Write(p []byte) (int, error) {
 			i++
 		}
 		t := time.Now()
-		c.chann.AddMessage(fmt.Sprintf("%s_ping=%s", t.Format("15:04:05"), pingS))
+		err := sendPingToServer(fmt.Sprintf("%s_ping=%s", t.Format("15:04:05"), pingS), c.config.User)
+		if err != nil {
+			c.logger.Error("error sending ping to server: %s", err, map[string]interface{}{})
+		}
 	}
 	return len(p), nil
 }
 
 func (c customWriter) Error() {
 	t := time.Now()
-	c.chann.AddMessage(fmt.Sprintf("%s: ping error", t.Format("2006-01-02 15:04:05")))
+	sendPingToServer(fmt.Sprintf("%s: ping error", t.Format("2006-01-02 15:04:05")), c.config.User)
 }
 
 func checkInternetSpeed(ctx context.Context, targets speedtest.Servers, conf Config) InternetSpeed {
@@ -207,16 +180,6 @@ func sendSpeedToServer(is InternetSpeed, user string) error {
 		return errors.New("error sending ping to server")
 	}
 	return nil
-}
-
-func decodeBytes(input []byte) string {
-	decoder := charmap.Windows1251.NewDecoder()
-	reader := decoder.Reader(strings.NewReader(string(input)))
-	b, err := ioutil.ReadAll(reader)
-	if err != nil {
-		panic(err)
-	}
-	return string(b)
 }
 
 func changeWindowsConsoleLanguage(logger Logger) {
