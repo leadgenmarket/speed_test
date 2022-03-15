@@ -35,12 +35,15 @@ func main() {
 	if err != nil {
 		logger.Panic("error while initializing config: %s", err, map[string]interface{}{})
 	}
+	logger.Info("initialized config", map[string]interface{}{})
 
 	changeWindowsConsoleLanguage(logger)
+	logger.Info("changed terminal language", map[string]interface{}{})
 	ctx := context.Background()
 	user, _ := speedtest.FetchUserInfo()
 	serverList, _ := speedtest.FetchServerListContext(ctx, user)
 	targets, _ := serverList.FindServer([]int{})
+	logger.Info("speed-test config recived", map[string]interface{}{})
 
 	go func(ctx context.Context, targets speedtest.Servers, conf Config, logger Logger) {
 		for {
