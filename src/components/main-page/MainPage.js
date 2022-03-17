@@ -83,13 +83,32 @@ const MainPage = () => {
         return <div>Загрузка</div>
     }
 
+    const calcLastPingLoss = (pings) => {
+        let lastTime = 0
+        let lastPingLosstime = ""
+        pings.forEach((ping) => {
+            let time = new Date(parseInt(ping.split("_")[0]) * 1000)
+            if (lastTime > 0 && (time - lastTime > 15000)) {
+                lastPingLosstime = time.getMinutes() < 10 ? time.getHours() + ":0" + time.getMinutes() + ":" + time.getSeconds() : time.getHours() + ":" + time.getMinutes() + ":" + time.getSeconds()
+            }
+            lastTime = time
+        })
+
+        return lastPingLosstime
+    }
+
     const pingsConvert = (pings) => {
         let arr = []
+        let lastTime = 0
         pings.forEach((ping) => {
             if (ping.length > 2) {
                 let time = new Date(parseInt(ping.split("_")[0]) * 1000)
+                if (lastTime > 0 && (time - lastTime > 15000)) {
+                    arr.push("<b style='color:red'>Потеря пакетов</b>")
+                }
+                lastTime = time
                 let pingStr = ping.split("_")[1]
-                let res = time.getMinutes() < 10 ? time.getHours() + ":0" + time.getMinutes() : time.getHours() + ":" + time.getMinutes()
+                let res = time.getMinutes() < 10 ? time.getHours() + ":0" + time.getMinutes() + ":" + time.getSeconds() : time.getHours() + ":" + time.getMinutes() + ":" + time.getSeconds()
                 res += " - " + pingStr
                 arr.push(res)
             }
@@ -118,6 +137,7 @@ const MainPage = () => {
             <td>{outsp} м/с</td>
             <td>{ping}</td>
             <td>{time.getMinutes() < 10 ? time.getHours() + ":0" + time.getMinutes() : time.getHours() + ":" + time.getMinutes()}</td>
+            <td>{calcLastPingLoss(pings)}</td>
             <td style={{ cursor: "pointer" }} onClick={() => showPings(pings)}>→</td>
         </tr>
     })
@@ -188,6 +208,7 @@ const MainPage = () => {
                                     <th>Исходящая скорость</th>
                                     <th>Пинг</th>
                                     <th>Последняя активность</th>
+                                    <th>Потеря пакетов</th>
                                     <th>Посмотреть пинги</th>
                                 </tr>
                             </thead>
