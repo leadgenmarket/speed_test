@@ -58,7 +58,7 @@ func main() {
 
 	for {
 		pingServer(conf.Server, conf.User, logger)
-		time.Sleep(time.Second * 30) //60
+		time.Sleep(time.Second * 10) //60
 	}
 
 }
