@@ -137,7 +137,7 @@ const MainPage = () => {
             <td>{outsp} м/с</td>
             <td>{ping}</td>
             <td>{time.getMinutes() < 10 ? time.getHours() + ":0" + time.getMinutes() : time.getHours() + ":" + time.getMinutes()}</td>
-            <td>{calcLastPingLoss(pings)}</td>
+            <td style={{ color: 'red' }}>{calcLastPingLoss(pings)}</td>
             <td style={{ cursor: "pointer" }} onClick={() => showPings(pings)}>→</td>
         </tr>
     })
